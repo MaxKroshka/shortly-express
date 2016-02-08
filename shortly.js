@@ -1,5 +1,6 @@
 var express = require('express');
 var util = require('./lib/utility');
+var bcrypt = require('bcrypt-nodejs');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 
@@ -37,7 +38,6 @@ app.use(bodyParser.urlencoded({
 app.use(express.static(__dirname + '/public'));
 
 var checkUser = function(req, res, next) {
-  console.log(req.session.user);
   if (req.session.user) {
     next();
   } else {
@@ -82,13 +82,13 @@ app.post('/links',
           }
 
           Links.create({
-              url: uri,
-              title: title,
-              baseUrl: req.headers.origin
-            })
-            .then(function(newLink) {
-              res.send(200, newLink);
-            });
+            url: uri,
+            title: title,
+            baseUrl: req.headers.origin
+          })
+          .then(function(newLink) {
+            res.send(200, newLink);
+          });
         });
       }
     });
@@ -106,7 +106,7 @@ app.post('/login', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
 
-  if (username === 'test' && password === 'test') {
+  if (password === 'test') {
     req.session.regenerate(function() {
       req.session.user = username;
       res.redirect('/');
@@ -120,6 +120,36 @@ app.post('/login', function(req, res) {
 app.get('/signup', function(req, res) {
   res.render('signup');
 });
+
+app.post('/signup', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+
+  //TODO: username validation  
+  // if (!util.isValidUrl(uri)) {
+  //   console.log('Not a valid url: ', uri);
+  //   return res.send(404);
+  // }
+
+  new User({username: username})
+    .fetch().then(function(found) {
+      console.log('trying to find username:', found);
+      if (found) {
+        console.log('user exists, redirecting');
+        return res.redirect('login');
+      } else {
+        Users.create({
+          username: username,
+          password: password //TODO
+        })
+        .then(function(user) {
+          console.log('created user:', user);
+          return res.redirect('login');
+        });
+      }
+    });
+});
+
 
 app.get('/logout', function(req, res) {
   req.session.destroy(function() {
