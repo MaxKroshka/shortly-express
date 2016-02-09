@@ -6,9 +6,6 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
 
-var bcrypt = require('bcrypt-nodejs');
-var crypto = require('crypto');
-
 var db = require('./app/config');
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
@@ -21,11 +18,9 @@ var app = express();
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 
-// ------------------------
+
 app.use(cookieParser('shhhh, very secret'));
 app.use(session());
-
-// ------------------------
 
 app.use(partials());
 // Parse JSON (uniform resource locators)
@@ -37,7 +32,6 @@ app.use(bodyParser.urlencoded({
 app.use(express.static(__dirname + '/public'));
 
 
-
 app.get('/', util.checkUser, function(req, res) {
   res.render('index');
 });
@@ -45,8 +39,6 @@ app.get('/', util.checkUser, function(req, res) {
 app.get('/create', util.checkUser, function(req, res) {
   res.render('index');
 });
-
-
 
 app.get('/links', util.checkUser, function(req, res) {
   db.knex('users').where({username: req.session.user}).select('id').then(function(id){
@@ -82,14 +74,15 @@ app.post('/links', function(req, res) {
             userID: id[0].id,
             title: title,
             baseUrl: req.headers.origin
-            }).then(function(newLink) {
-              res.send(200, newLink);
-            });
+          }).then(function(newLink) {
+            res.send(200, newLink);
+          });
         });
       }
     });
   });
 });
+
 
 /************************************************************/
 // Write your authentication routes here
@@ -103,17 +96,19 @@ app.post('/login', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
   db.knex('users').where({username: username}).select('password')
-  .then(function(rows){
-    if(rows.length < 1){return res.redirect('signup');}
-    if(util.encrypt(password) === rows[0].password){
-      req.session.regenerate(function() {
-        req.session.user = username;
-        res.redirect('/');
+    .then(function(rows){
+      if(rows.length < 1){return res.redirect('signup');}
+      bcrypt.compare(password, rows[0].password, function(err, result) {
+        if(result) {
+          req.session.regenerate(function() {
+            req.session.user = username;
+            res.redirect('/');
+          });
+        } else {
+          res.redirect('login');
+        }
       });
-    } else {
-      res.redirect('login');
-    }
-  });
+    });
 });
 
 app.get('/signup', function(req, res) {
@@ -130,31 +125,31 @@ app.post('/signup', function(req, res) {
   }
 
   new User({username: username})
-    .fetch().then(function(found) {
-      console.log('trying to find username:', found);
-      if (found) {
-        console.log('user exists, redirecting');
-        return res.redirect('login');
-      } else {
+  .fetch().then(function(found) {
+    console.log('trying to find username:', found);
+    if (found) {
+      console.log('user exists, redirecting');
+      return res.redirect('login');
+    } else {
+      bcrypt.hash(req.body.password, null, null, function (err, hash) {
         Users.create({
           username: username,
-          password: password
+          password: hash
         })
         .then(function(user) {
           console.log('created user:', user);
           return res.redirect('login');
         });
-      }
-    });
+      });
+    }
+  });
 });
-
 
 app.get('/logout', function(req, res) {
   req.session.destroy(function() {
     res.redirect('login');
   });
 });
-
 
 
 /************************************************************/
