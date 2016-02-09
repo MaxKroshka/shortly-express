@@ -3,12 +3,11 @@ var util = require('./lib/utility');
 var bcrypt = require('bcrypt-nodejs');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
-
-// ------------------------
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
 
-// ------------------------
+var bcrypt = require('bcrypt-nodejs');
+var crypto = require('crypto');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -106,17 +105,18 @@ app.post('/login', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
   db.knex('users').where({username: username}).select('password')
-    .then(function(rows){
-    if(rows.length < 1){return res.redirect('signup');}  
-    if (password === rows[0].password) {
-      req.session.regenerate(function() {
-        req.session.user = username;
-        res.redirect('/');
-      });
-    } else {
-      res.redirect('login');
-    }
-  });
+  .then(function(rows){
+    if(rows.length < 1){return res.redirect('signup');}
+
+      if(util.encrypt(password) === rows[0].password){
+        req.session.regenerate(function() {
+          req.session.user = username;
+          res.redirect('/');
+        });
+      } else {
+        res.redirect('login');
+      }
+    });
 });
 
 app.get('/signup', function(req, res) {
@@ -142,7 +142,7 @@ app.post('/signup', function(req, res) {
       } else {
         Users.create({
           username: username,
-          password: password //TODO
+          password: password
         })
         .then(function(user) {
           console.log('created user:', user);
