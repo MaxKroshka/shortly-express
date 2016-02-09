@@ -105,16 +105,18 @@ app.get('/login', function(req, res) {
 app.post('/login', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
-
-  if (password === 'test') {
-    req.session.regenerate(function() {
-      req.session.user = username;
-      res.redirect('/');
-    });
-  } else {
-    res.redirect('login');
-  }
-
+  db.knex('users').where({username: username}).select('password')
+    .then(function(rows){
+    if(rows.length < 1){return res.redirect('signup');}  
+    if (password === rows[0].password) {
+      req.session.regenerate(function() {
+        req.session.user = username;
+        res.redirect('/');
+      });
+    } else {
+      res.redirect('login');
+    }
+  });
 });
 
 app.get('/signup', function(req, res) {
