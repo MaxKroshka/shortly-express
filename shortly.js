@@ -107,16 +107,15 @@ app.post('/login', function(req, res) {
   db.knex('users').where({username: username}).select('password')
   .then(function(rows){
     if(rows.length < 1){return res.redirect('signup');}
-
-      if(util.encrypt(password) === rows[0].password){
-        req.session.regenerate(function() {
-          req.session.user = username;
-          res.redirect('/');
-        });
-      } else {
-        res.redirect('login');
-      }
-    });
+    if(util.encrypt(password) === rows[0].password){
+      req.session.regenerate(function() {
+        req.session.user = username;
+        res.redirect('/');
+      });
+    } else {
+      res.redirect('login');
+    }
+  });
 });
 
 app.get('/signup', function(req, res) {
