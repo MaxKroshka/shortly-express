@@ -36,40 +36,38 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(express.static(__dirname + '/public'));
 
-var checkUser = function(req, res, next) {
-  if (req.session.user) {
-    next();
-  } else {
-    req.session.error = 'Access denied!';
-    res.redirect('/login');
-  }
-};
 
-app.get('/', checkUser, function(req, res) {
+
+app.get('/', util.checkUser, function(req, res) {
   res.render('index');
 });
 
-app.get('/create', checkUser, function(req, res) {
+app.get('/create', util.checkUser, function(req, res) {
   res.render('index');
 });
 
-app.get('/links', checkUser, function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
+
+
+app.get('/links', util.checkUser, function(req, res) {
+  db.knex('users').where({username: req.session.user}).select('id').then(function(id){
+    Links.reset().query(function(qb) {qb.where('userID', '=',id[0].id); })
+      .fetch().then(function(links) {
+        res.send(200, links.models);
+      });
   });
 });
 
-app.post('/links',
-  function(req, res) {
-    var uri = req.body.url;
+app.post('/links', function(req, res) {
+  var uri = req.body.url;
 
-    if (!util.isValidUrl(uri)) {
-      console.log('Not a valid url: ', uri);
-      return res.send(404);
-    }
-
+  if (!util.isValidUrl(uri)) {
+    console.log('Not a valid url: ', uri);
+    return res.send(404);
+  }
+  db.knex('users').where({username: req.session.user}).select('id').then(function(id){
     new Link({
-      url: uri
+      url: uri,
+      userID: id[0].id
     }).fetch().then(function(found) {
       if (found) {
         res.send(200, found.attributes);
@@ -79,19 +77,19 @@ app.post('/links',
             console.log('Error reading URL heading: ', err);
             return res.send(404);
           }
-
           Links.create({
             url: uri,
+            userID: id[0].id,
             title: title,
             baseUrl: req.headers.origin
-          })
-          .then(function(newLink) {
-            res.send(200, newLink);
-          });
+            }).then(function(newLink) {
+              res.send(200, newLink);
+            });
         });
       }
     });
   });
+});
 
 /************************************************************/
 // Write your authentication routes here
@@ -126,11 +124,10 @@ app.post('/signup', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
 
-  //TODO: username validation  
-  // if (!util.isValidUrl(uri)) {
-  //   console.log('Not a valid url: ', uri);
-  //   return res.send(404);
-  // }
+  if (!util.isValidUsername(username)) {
+    console.log('Not a valid username: ', username);
+    return res.send(404);
+  }
 
   new User({username: username})
     .fetch().then(function(found) {
