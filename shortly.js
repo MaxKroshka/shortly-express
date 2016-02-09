@@ -5,6 +5,7 @@ var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
+var favicon = require('serve-favicon');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -14,7 +15,7 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
 var app = express();
-
+app.use(favicon(__dirname + '/views/favicon.ico'));
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 
@@ -126,7 +127,6 @@ app.post('/signup', function(req, res) {
 
   new User({username: username})
   .fetch().then(function(found) {
-    console.log('trying to find username:', found);
     if (found) {
       console.log('user exists, redirecting');
       return res.redirect('login');
@@ -159,23 +159,27 @@ app.get('/logout', function(req, res) {
 /************************************************************/
 
 app.get('/*', function(req, res) {
-  new Link({
-    code: req.params[0]
-  }).fetch().then(function(link) {
-    if (!link) {
-      res.redirect('/');
-    } else {
-      var click = new Click({
-        linkId: link.get('id')
-      });
-
-      click.save().then(function() {
-        link.set('visits', link.get('visits') + 1);
-        link.save().then(function() {
-          return res.redirect(link.get('url'));
+  db.knex('users').where({username: req.session.user}).select('id').then(function(id){
+    if(id.length < 1){return res.send(404);}
+    new Link({
+      code: req.params[0],
+      userID: id[0].id
+    }).fetch().then(function(link) {
+      if (!link) {
+        res.redirect('/');
+      } else {
+        var click = new Click({
+          linkId: link.get('id')
         });
-      });
-    }
+
+        click.save().then(function() {
+          link.set('visits', link.get('visits') + 1);
+          link.save().then(function() {
+            return res.redirect(link.get('url'));
+          });
+        });
+      }
+    });
   });
 });
 
